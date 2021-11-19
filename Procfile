@@ -1,1 +1,1 @@
-web: java -jar build/libs/BestTwoEmployeesTeam-0.0.1-SNAPSHOT.jar
+web: java -jar build/libs/employees-teams.jar
