@@ -1,3 +1,23 @@
+/*
+ * The ProjectServiceImpl accept as input argument List<Job>,
+ * orderedByProjectId, then by EmployeeId.
+ * Iterate over each element from the collection, comparing it
+ * with the Dates of the next element.
+ * The matching Periods are kept in a HashMap with key - Team(EmpId1 EmpId2),
+ * and value - nested HashMap with key - ProjectId and value - Worked days.
+ *
+ * Then sort all Teams total Work days in Descending order, and find the
+ * Best Team or Teams(if the topmost have same amount of days).
+ *
+ * The found Best Team is
+ *
+ * Version information - v.1.0
+ *
+ * Date - 20.Nov.2021
+ *
+ * Copyright notice - none
+ */
+
 package com.sirma.employees.service.impl;
 
 import com.sirma.employees.model.Job;
@@ -7,19 +27,19 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ProjectServiceImpl implements ProjectService {
-    @Override
-    public List<Project> getBestTeamProjects(List<Job> jobsSortedByProjectId) {
 
-        // Key - EmpId_1 + EmpId_2; Value -> HashMap<Key(ProjectId), Value(Days worked)>
-        HashMap<String, HashMap<String, Integer>> result = new HashMap<>();
+    @Override
+    public List<Project> getBestTeamProjects(List<Job> jobs) {
+        // order the list of Jobs
+        List<Job> jobsSortedByProjectId = listOrderByProjectIdThenEmployeeId(jobs);
+
+        // Key - "EmpId_1 EmpId_2"; Value -> HashMap<ProjectId, Sum Days worked>
+        HashMap<String, HashMap<String, Integer>> teamsData = new HashMap<>();
 
         // Nested loops -> O(n^2) - quadratic complexity - can be optimized ?!
         for (int i = 0; i < jobsSortedByProjectId.size(); i++) {
@@ -36,14 +56,15 @@ public class ProjectServiceImpl implements ProjectService {
                     LocalDate aDateTo = currentJob.getDateTo();
                     LocalDate bDateFrom = jobToCompare.getDateFrom();
                     LocalDate bDateTo = jobToCompare.getDateTo();
-                    // compare the periods they work on this same Project, if they match
+
+                    // compare the periods both Employees work on this same Project, if they match
                     if (matchingPeriod(aDateFrom, aDateTo, bDateFrom, bDateTo)) {
                         String key = currentJob.getEmployeeId() + " " + jobToCompare.getEmployeeId();
 
-                        result.putIfAbsent(key, new HashMap<>());
+                        teamsData.putIfAbsent(key, new HashMap<>());
 
                         String projectId = currentJob.getProjectId();
-                        HashMap<String, Integer> projectIdDaysMap = result.get(key);
+                        HashMap<String, Integer> projectIdDaysMap = teamsData.get(key);
                         projectIdDaysMap.putIfAbsent(projectId, 0);
 
                         Integer currentDays = projectIdDaysMap.get(projectId);
@@ -54,9 +75,9 @@ public class ProjectServiceImpl implements ProjectService {
             }
         }
 
-        // find best Team
+        // find best Team, with most Work days
         HashMap<String, Integer> teamsDays = new HashMap<>();
-        result.forEach((ids, map) -> {
+        teamsData.forEach((ids, map) -> {
             int totalDays = map.values()
                     .stream()
                     .mapToInt(el -> el)
@@ -65,20 +86,20 @@ public class ProjectServiceImpl implements ProjectService {
             teamsDays.put(ids, teamsDays.get(ids) + totalDays);
         });
 
-        List<Map.Entry<String, Integer>> teamsOrderedByDaysDesc = teamsDays.entrySet()
+        List<Map.Entry<String, Integer>> teamsOrderedByTotalDaysDesc = teamsDays.entrySet()
                 .stream()
                 .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
                 .collect(Collectors.toList());
 
         String bestTeam = "";
-        if (!teamsOrderedByDaysDesc.isEmpty()) {
-            bestTeam = teamsOrderedByDaysDesc.get(0).getKey();
+        if (!teamsOrderedByTotalDaysDesc.isEmpty()) {
+            bestTeam = teamsOrderedByTotalDaysDesc.get(0).getKey();
         }
 
         List<Project> bestTeamProjects = new ArrayList<>();
-        // print only Best Team - projects / days
+        // output only Best Team - projects / days
         String[] empId1EmpId2 = bestTeam.split(" ");
-        result.get(bestTeam)
+        teamsData.get(bestTeam)
                 .forEach((k, v) -> {
                     Project project = new Project().setEmployeeId1(empId1EmpId2[0]).setEmployeeId2(empId1EmpId2[1])
                             .setProjectId(k).setDays(v);
@@ -86,25 +107,24 @@ public class ProjectServiceImpl implements ProjectService {
                     System.out.println(project);
                 });
 
-//        System.out.println("------ TESTING All records printing - TO BE DELETED ! -------");
-//        // print all records
-//        for (Map.Entry<String, HashMap<String, Long>> entry : result.entrySet()) {
-//            String[] allEmpId1EmpId2 = entry.getKey().split(" ");
-//            entry.getValue()
-//                    .forEach((k, v) -> System.out.println(allEmpId1EmpId2[0] + " | " + allEmpId1EmpId2[1] + " | " + k + " | " + v));
-//        }
-
         return bestTeamProjects;
     }
 
-    private boolean matchingPeriod(LocalDate aDateFrom, LocalDate aDateTo,
-                                   LocalDate bDateFrom, LocalDate bDateTo) {
-        if (aDateFrom.isAfter(bDateTo) || aDateTo.isBefore(bDateFrom)) {
-            return false;
-        }
-        return true;
+    // method for sorting List<Job> by ProjectId, then EmployeeID
+    private List<Job> listOrderByProjectIdThenEmployeeId(List<Job> jobs) {
+        return jobs.stream()
+                .sorted(Comparator.comparing(Job::getProjectId))
+                .sorted(Comparator.comparing(Job::getEmployeeId))
+                .collect(Collectors.toList());
     }
 
+    // method for approval of matching periods between Dates
+    private boolean matchingPeriod(LocalDate aDateFrom, LocalDate aDateTo,
+                                   LocalDate bDateFrom, LocalDate bDateTo) {
+        return !aDateFrom.isAfter(bDateTo) && !aDateTo.isBefore(bDateFrom);
+    }
+
+    // method for calculating days of matching periods
     private int calculateDays(LocalDate aDateFrom, LocalDate aDateTo,
                                LocalDate bDateFrom, LocalDate bDateTo) {
     // ChronoUnit.DAYS.between(param1, param2) - return the difference from data(incl.) to date(excl.)
