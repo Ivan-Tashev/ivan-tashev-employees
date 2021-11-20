@@ -22,14 +22,20 @@ public class DateUtility {
     private static final Logger LOGGER = LoggerFactory.getLogger(DateUtility.class);
     public static final String[] DATE_FORMATS =
             {                                       /* supported Date formats */
+                    "yy-M-d",
                     "yyyy-M-d",
                     "yyyy-MM-dd",
                     "yyyyMMdd",
                     "d/M/yy",
                     "dd/MM/yy",
+                    "d/M/yyyy",
                     "dd/MM/yyyy",
+                    "d MMM yy",
+                    "dd MMM yy",
                     "d MMM yyyy",
                     "dd MMM yyyy",
+                    "d MMMM yy",
+                    "dd MMMM yy",
                     "d MMMM yyyy",
                     "dd MMMM yyyy",
                     "yyyy.MM.dd G 'at' HH:mm:ss z",
